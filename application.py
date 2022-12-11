@@ -1,4 +1,5 @@
 from flask_mysqldb import MySQL
+
 import simplejson as json
 import recom_system
 import tag_cr
@@ -15,26 +16,49 @@ app.config['MYSQL_PASSWORD'] = '0976'
 app.config['MYSQL_DB'] = 'recomdb'
 
 db = MySQL(app)
-URL = "https://weatherable-flask-lhavr.run.goorm.io/"
+URL = "https://weatherable-flask-psgys.run.goorm.io/"
 
-@app.route("/")
+@app.route("/")    
 def index():
+    return "hello"
+
+ 
+@app.route("/users", methods=["GET"])    # 사용자 조회
+def users():
     query = 'select * from user'
     cur = db.connection.cursor()
     cur.execute(query)
-    
-    data = cur.fetchall()
+    res = json.dumps(cur.fetchall())
 
-    li = []
-    for d in data:
-        res = {'id': d[0], 'uid': d[1], 'email': d[2]}
-        li.append(res)
-
-    res = json.dumps(li)
     return res
+    
+@app.route("/users/sign-in", methods=["GET", "POST"]) # 회원가입
+def sign_in():       
+    if request.method == 'POST':
+        userData = request.form
+        uid = userData['uid']
+        email = userData['email']
+        query = '''insert into user values (null, "{}", "{}")'''.format(uid, email)
 
+        cur = db.connection.cursor()
+        cur.execute(query)        
+        
+        select_query = 'select id from user where "{}"=user.email'.format(email)
+        curr = db.connection.cursor()
+        curr.execute(select_query)
+        
+        db.connection.commit()
+        
+        li = []
+        uid = json.dumps(curr.fetchall()).strip('[]')
+        res = {'id': uid}
+        li.append(res)
+        print(email)
 
-@app.route("/rateOK")
+        resp = json.dumps(li)
+        return resp
+
+@app.route("/users/rate")    # 유저 평가값 조회
 def TagRateCheck():
     query = 'select * from rate'
     cur = db.connection.cursor()
@@ -43,7 +67,7 @@ def TagRateCheck():
 
     return res
 
-@app.route("/place", methods=["GET"])
+@app.route("/places", methods=["GET"])    # 장소 조회
 def place():
     query = 'select * from place'
     cur = db.connection.cursor()
@@ -52,7 +76,7 @@ def place():
 
     return res
 
-@app.route("/user_post", methods=["GET", "POST"])
+@app.route("/users/uid", methods=["GET", "POST"])    # user email을 비교하여 uid 반환
 def user_post():
     if request.method == 'POST':
         userData = request.form['email']
@@ -71,41 +95,7 @@ def user_post():
         return resp
         
 
-@app.route("/user", methods=["GET", "POST"])
-def user():
-    if request.method == 'GET':
-        query = 'select * from user'
-        cur = db.connection.cursor()
-        cur.execute(query)
-        res = json.dumps(cur.fetchall())
-
-        return res
-        
-        
-    elif request.method == 'POST':
-        userData = request.form
-        uid = userData['uid']
-        email = userData['email']
-        query = '''insert into user values (null, "{}", "{}")'''.format(uid, email)
-
-        cur = db.connection.cursor()
-        cur.execute(query)
-        
-        select_query = 'select id from user where "{}"=user.email'.format(email)
-        curr = db.connection.cursor()
-        curr.execute(select_query)
-        
-        db.connection.commit()
-        
-        li = []
-        uid = json.dumps(curr.fetchall()).strip('[]')
-        res = {'id': uid}
-        li.append(res)
-
-        resp = json.dumps(li)
-        return resp
-
-@app.route("/tag", methods=["GET", "POST"])
+@app.route("/places/tag", methods=["GET", "POST"])    # 태그 조회
 def tag():
     query = 'select * from tag'
     cur = db.connection.cursor()
@@ -116,9 +106,9 @@ def tag():
     return res
 
 
-@app.route("/tag_place", methods=["GET", "POST"])
+@app.route("/places/tag/rate", methods=["GET", "POST"])    
 def tag_place():
-    if request.method == 'GET':
+    if request.method == 'GET':     #설문조사 태그 랜덤 추출
         query = 'select id, title from tag order by rand() limit 7'
         cur = db.connection.cursor()
         cur.execute(query)
@@ -134,7 +124,7 @@ def tag_place():
 
         return res
 
-    elif request.method == 'POST':
+    elif request.method == 'POST':      # 평가값 insert
         rateData = request.form
     
         uid = rateData['user_id']
@@ -154,9 +144,9 @@ def tag_place():
         return TagRateCheck()
 
 
-@app.route("/rate", methods=["GET", "POST"])
+@app.route("/users/rate", methods=["GET", "POST"]) 
 def rate():
-    if request.method == 'GET':
+    if request.method == 'GET':     # 평가값 조회 
         query = 'select * from rate'
         cur = db.connection.cursor()
         cur.execute(query)
@@ -164,7 +154,7 @@ def rate():
         
         return res
 
-    elif request.method == 'POST':
+    elif request.method == 'POST':      # 평가값 등록
         starRate = request.form
         rating = starRate['rating']
 
@@ -172,13 +162,7 @@ def rate():
         return res
 
         
-@app.route("/rating", methods=["GET", "POST"])
-def rating():
-    recom_place = recom_system.main(URL)
-    return recom_place
-
-
-@app.route("/distance", methods=["GET", "POST"])
+@app.route("/places/req", methods=["GET", "POST"])    # 추천리스트 요청
 def distance():
     if request.method == 'POST':
         location = request.form
@@ -189,9 +173,8 @@ def distance():
         uid = location['uid']
 
         query = '''select id, title, tag, address, x,y, (6371 * acos(cos(radians({})) * cos(radians(y)) * cos(radians(x) - radians({})) + sin(radians({})) * sin(radians(y)))) as distance from place having distance <= 20 order by distance'''.format(y_, x_, y_)
-
+    
         cur = db.connection.cursor()
-        jsn = []
         cur.execute(query)
         dist = json.dumps(cur.fetchall())
         
@@ -201,7 +184,7 @@ def distance():
     elif request.method == 'GET':
         pass
 
-@app.route("/send_review", methods=["POST"])
+@app.route("/story/post", methods=["POST"]) # 리뷰 작성시 새로운 장소 등록, 사용자 평가, 태그 등록 등
 def send_review():
     review = request.form
     
@@ -220,6 +203,7 @@ def send_review():
     query = '''insert into tag (id, title) select null, "{}" from dual where not exists(select * from tag where title = "{}")'''.format(tag_, tag_)
     cur.execute(query)
     db.connection.commit()
+    
     #tag의 id 구하기
     query = '''select id from tag where title = "{}"'''.format(tag_)
     cur.execute(query)
@@ -249,7 +233,7 @@ def send_review():
     return index()
 
 
-@app.route("/reviews_post", methods=["POST"])
+@app.route("/story/insert", methods=["POST"]) # 게시글 insert
 def reviews_post():
     
     if request.method == 'POST':
@@ -269,18 +253,16 @@ def reviews_post():
         
         return "업로드 성공"
  
-@app.route("/reviews_get", methods=["POST"])
+@app.route("/story/read/uid", methods=["GET"]) # 사용자 uid와 일치하는 리뷰만 불러오기
 def reviews_get():
-    if request.method == 'POST':
-        reviews = request.form
-        uid_ = reviews['uid']
+    if request.method == 'GET':
+        uid = request.args.get('id')
+
+        query = '''select * from reviews where uid="{}"'''.format(uid)
         
         cur = db.connection.cursor()
-        query = '''select *from reviews where uid="{}" '''.format(uid_)
-        
         cur.execute(query)
-        db.connection.commit()
-        
+   
         enco = lambda obj: (
             obj.isoformat()
             if isinstance(obj, datetime.datetime) or isinstance(obj, datetime.date)
@@ -288,9 +270,11 @@ def reviews_get():
         )
 
         res = json.dumps(cur.fetchall(), default = enco)
+        print(res)
         return recom_system.trans(res)
 
-@app.route("/reviews_get/postId", methods=["GET"])
+
+@app.route("/story/read/post-id", methods=["GET"]) # 리뷰 상세히 불러오기
 def reviews_get_detail():
     if request.method == 'GET':
         reviews = request.args.get('id')
@@ -307,7 +291,7 @@ def reviews_get_detail():
     
         res = json.dumps(cur.fetchall(), default = enco)
         return recom_system.trans(res)
+   
 
-    
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=80, debug=True)
