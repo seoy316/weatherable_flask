@@ -46,7 +46,7 @@ def trans(files):
     return d
 
 
-def getDist(dist):
+def getDist(dist): # 사용자 현재 위치와 장소 거리 비교    
     p_cols = ['place_id', 'title', 'tag', 'address','x', 'y', 'dist']
 
     data = json.loads(dist)
@@ -60,21 +60,21 @@ def main(URL, distList, wCode, uid):
         t_cols = ['tag_id', 'title']
         r_cols = ['user_id', 'tag_id', 'weather', 'rating']
 
-        url = URL+"/user"
+        url = URL+"/users"
         result = requests.get(url)
         data = json.loads(result.text)
         users = pd.DataFrame(data, columns=u_cols)
 
-        url = URL+"/tag"
+        url = URL+"/places/tag"
         result = requests.get(url)
         data = json.loads(result.text)
         tag = pd.DataFrame(data, columns=t_cols)
         
-
-        url = URL+"/rate"
+        url = URL+"/users/rate"
         result = requests.get(url)
         data = json.loads(result.text)
         ratings = pd.DataFrame(data, columns=r_cols)
+        
 
         users = users[['user_id']]
         tags = tag[['tag_id', 'title']]
